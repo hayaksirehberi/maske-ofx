@@ -1,0 +1,77 @@
+<svg width="1280" height="320" viewBox="0 0 1280 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Maske — history-brush masking for DaVinci Resolve">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#14161b"/>
+      <stop offset="1" stop-color="#1d2129"/>
+    </linearGradient>
+    <linearGradient id="stroke" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#2dd177" stop-opacity="0"/>
+      <stop offset="0.25" stop-color="#2dd177" stop-opacity="0.55"/>
+      <stop offset="0.75" stop-color="#35e08a" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#35e08a" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="blur" x="-20%" y="-60%" width="140%" height="220%">
+      <feGaussianBlur stdDeviation="14"/>
+    </filter>
+  </defs>
+
+  <rect width="1280" height="320" fill="url(#bg)"/>
+
+  <!-- film strip perforations -->
+  <g fill="#0c0e12">
+    <rect x="0" y="0" width="1280" height="34"/>
+    <rect x="0" y="286" width="1280" height="34"/>
+  </g>
+  <g fill="#242a35">
+    <g id="perfs">
+      <rect x="24"  y="9" width="26" height="16" rx="4"/>
+      <rect x="88"  y="9" width="26" height="16" rx="4"/>
+      <rect x="152" y="9" width="26" height="16" rx="4"/>
+      <rect x="216" y="9" width="26" height="16" rx="4"/>
+      <rect x="280" y="9" width="26" height="16" rx="4"/>
+      <rect x="344" y="9" width="26" height="16" rx="4"/>
+      <rect x="408" y="9" width="26" height="16" rx="4"/>
+      <rect x="472" y="9" width="26" height="16" rx="4"/>
+      <rect x="536" y="9" width="26" height="16" rx="4"/>
+      <rect x="600" y="9" width="26" height="16" rx="4"/>
+      <rect x="664" y="9" width="26" height="16" rx="4"/>
+      <rect x="728" y="9" width="26" height="16" rx="4"/>
+      <rect x="792" y="9" width="26" height="16" rx="4"/>
+      <rect x="856" y="9" width="26" height="16" rx="4"/>
+      <rect x="920" y="9" width="26" height="16" rx="4"/>
+      <rect x="984" y="9" width="26" height="16" rx="4"/>
+      <rect x="1048" y="9" width="26" height="16" rx="4"/>
+      <rect x="1112" y="9" width="26" height="16" rx="4"/>
+      <rect x="1176" y="9" width="26" height="16" rx="4"/>
+      <rect x="1240" y="9" width="26" height="16" rx="4"/>
+    </g>
+    <use href="#perfs" y="286"/>
+  </g>
+
+  <!-- glowing brush stroke sweeping behind the title -->
+  <path d="M 120 200 C 320 130, 560 250, 800 175 S 1150 140, 1200 165"
+        fill="none" stroke="url(#stroke)" stroke-width="58" stroke-linecap="round" filter="url(#blur)"/>
+  <path d="M 120 200 C 320 130, 560 250, 800 175 S 1150 140, 1200 165"
+        fill="none" stroke="#35e08a" stroke-opacity="0.28" stroke-width="30" stroke-linecap="round"/>
+
+  <!-- brush cursor ring at the stroke tip -->
+  <circle cx="1200" cy="165" r="34" fill="none" stroke="#35e08a" stroke-width="2.5" stroke-dasharray="6 7"/>
+  <circle cx="1200" cy="165" r="4" fill="#35e08a"/>
+
+  <!-- dust speckles being masked away -->
+  <g fill="#8a93a6" opacity="0.5">
+    <circle cx="255" cy="105" r="2.4"/>
+    <circle cx="410" cy="235" r="1.8"/>
+    <circle cx="620" cy="95"  r="2.2"/>
+    <circle cx="905" cy="240" r="1.6"/>
+    <circle cx="1055" cy="98" r="2.0"/>
+  </g>
+
+  <!-- title -->
+  <text x="96" y="172" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif"
+        font-size="86" font-weight="700" fill="#f2f4f8" letter-spacing="1">Maske</text>
+  <text x="100" y="216" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif"
+        font-size="25" fill="#aab3c4">History-brush masking inside DaVinci Resolve&#8217;s Color page</text>
+  <text x="100" y="252" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif"
+        font-size="17" fill="#5f6a7d" letter-spacing="3">OPENFX&#160;&#160;·&#160;&#160;CUDA&#160;&#160;·&#160;&#160;METAL&#160;&#160;·&#160;&#160;PER-FRAME MATTE PAINTING</text>
+</svg>
