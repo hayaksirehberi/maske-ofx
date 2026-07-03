@@ -19,24 +19,24 @@ Maske removes the round trip. It was built for film restoration work — masking
 
 ## How it works
 
-Maske sits on its own node. It passes the image through untouched and writes your brush strokes into the **alpha channel** as a matte. With Resolve's **Use OFX Alpha** enabled, that matte becomes the node's key output, which you route into the node whose effect you want to suppress:
+Maske lives on its own node **outside the serial image path**: the source feeds it in parallel, its image output stays disconnected, and only its key matters. Your brush strokes become the **alpha channel**, and with Resolve's **Use OFX Alpha** enabled that alpha becomes the node's key output — which you route into the node whose effect you want to suppress:
 
 ```mermaid
 flowchart LR
-    A[01<br/>Grade] --> B[02<br/>Maske<br/><i>Use OFX Alpha, Invert on</i>]
-    B --> C[03<br/>Automatic Dirt Removal]
-    B -. "key output → key input" .-> C
-    C --> D[Output]
+    S((Source)) --> A["01<br/>Automatic Dirt Removal"]
+    S --> M["02<br/>Maske<br/><i>Use OFX Alpha, Invert on</i>"]
+    M -. "key output → key input" .-> A
+    A --> O((Output))
 ```
 
 Painted areas kill the dirt-removal key, so the original image shows through exactly where you brushed — the history-brush behavior, natively in the Color page.
 
 ### Setup in 30 seconds
 
-1. Add Maske (OpenFX → *Mustafa Ekinci → Maske*) to its own node.
-2. Right-click the node → **Use OFX Alpha**.
-3. Turn on **Invert** in the plugin controls.
-4. Connect the node's key output (blue triangle) to the target node's key input.
+1. Add a new node and connect the **Source directly to its RGB input**, leaving its RGB output unconnected — it sits parallel to your chain.
+2. Drop Maske on it (OpenFX → *Mustafa Ekinci → Maske*).
+3. Right-click the node → **Use OFX Alpha**, and turn on **Invert** in the plugin controls.
+4. Drag the node's key output (blue square) to the dirt-removal node's key input (blue triangle).
 5. Paint in the viewer. Done.
 
 ## Features
