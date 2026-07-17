@@ -121,16 +121,18 @@ extern "C" bool HistoryBrushMetalRender(void* queuePtr, const GpuRenderArgs* arg
         id<MTLBuffer> dstBuf = (__bridge id<MTLBuffer>)args->dst;
         if (!dstBuf) return false;
 
+        // Shared storage works on both Apple Silicon and Intel; Managed is
+        // unavailable on Apple Silicon and would need explicit didModifyRange.
         id<MTLBuffer> stampBuf = nil;
         if (args->nStamps > 0) {
             stampBuf = [device newBufferWithBytes:args->stamps
                                            length:args->nStamps * sizeof(GpuStamp)
-                                          options:MTLResourceStorageModeManaged];
+                                          options:MTLResourceStorageModeShared];
         } else {
             // Metal requires a bound buffer even when unused.
             GpuStamp dummy = {};
             stampBuf = [device newBufferWithBytes:&dummy length:sizeof(GpuStamp)
-                                          options:MTLResourceStorageModeManaged];
+                                          options:MTLResourceStorageModeShared];
         }
 
         MetalParams p;
