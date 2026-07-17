@@ -77,6 +77,14 @@ struct EffectInstance {
     double lastStampX = 0, lastStampY = 0;
     int    nudgeCounter = 0;
 
+    // Opt/Alt-drag brush adjust: hold Alt and drag — horizontal changes size,
+    // vertical changes softness. altHeld is tracked from key events; a stroke's
+    // mode is locked in at pen-down so a mid-stroke key glitch can't flip it.
+    bool   altHeld = false;
+    bool   adjusting = false;
+    double adjStartX = 0, adjStartY = 0;      // pen-down anchor (canonical)
+    double adjStartSize = 0, adjStartSoft = 0;
+
     std::string serialize() {
         std::string out;
         char buf[128];
@@ -242,6 +250,10 @@ static OfxStatus interactMain(const char* action, const void* handle,
         // denser hard core sitting inside a fainter full-radius halo.
         OfxRGBAColourF tint = erase ? OfxRGBAColourF{0.35f, 0.55f, 1.0f, 1.0f}
                                     : OfxRGBAColourF{1.0f, 0.22f, 0.22f, 1.0f};
+        // Yellow while Opt is held / adjusting — also confirms at a glance that
+        // Resolve is delivering the modifier to the plugin.
+        if (inst->altHeld || inst->adjusting)
+            tint = OfxRGBAColourF{1.0f, 0.80f, 0.15f, 1.0f};
 
         OfxRGBAColourF halo = tint; halo.a = 0.18f;
         gDrawSuite->setColour(ctx, &halo);
@@ -274,35 +286,26 @@ static OfxStatus interactMain(const char* action, const void* handle,
         return kOfxStatOK;
     }
 
-    // Keyboard shortcuts: adjust the brush without leaving the viewer. Arrow keys
-    // are used because their key codes are identical on every keyboard layout
-    // (Turkish, US, etc.) and need no AltGr/Shift — unlike bracket keys. Up/Down
-    // size (multiplicative, so steps feel even across the 2..2000 range),
-    // Left/Right soften. Redraw so the highlight + readout reflect the new value.
+    // Track the Alt/Option modifier for Opt-drag brush adjust. Keyboard shortcuts
+    // proved unusable (Resolve grabs keys like the arrows for clip navigation), so
+    // we only watch the modifier and do the actual adjust with the mouse in the
+    // pen handler below. Bare Alt isn't bound to a Resolve action, so it has a
+    // better chance of reaching the interact than a bound key does — but if it
+    // doesn't arrive, altHeld simply stays false and dragging paints as usual.
     if (strcmp(action, kOfxInteractActionKeyDown) == 0 ||
-        strcmp(action, kOfxInteractActionKeyRepeat) == 0) {
+        strcmp(action, kOfxInteractActionKeyRepeat) == 0 ||
+        strcmp(action, kOfxInteractActionKeyUp) == 0) {
         OfxImageEffectHandle effect = interactEffect(inArgs);
-        if (!effect) return kOfxStatReplyDefault;
+        EffectInstance* inst = effect ? instanceData(effect) : nullptr;
+        if (!inst) return kOfxStatReplyDefault;
         int key = 0;
         gPropSuite->propGetInt(inArgs, kOfxPropKeySym, 0, &key);
-
-        const char* changed = nullptr;
-        double value = 0;
-        switch (key) {
-            case kOfxKey_Up:                                                       // bigger
-                changed = P_BRUSH_SIZE; value = std::min(2000.0, getDouble(effect, P_BRUSH_SIZE) * 1.15); break;
-            case kOfxKey_Down:                                                     // smaller
-                changed = P_BRUSH_SIZE; value = std::max(2.0, getDouble(effect, P_BRUSH_SIZE) / 1.15); break;
-            case kOfxKey_Right:                                                    // softer
-                changed = P_SOFTNESS; value = std::min(0.99, getDouble(effect, P_SOFTNESS) + 0.05); break;
-            case kOfxKey_Left:                                                     // harder
-                changed = P_SOFTNESS; value = std::max(0.0, getDouble(effect, P_SOFTNESS) - 0.05); break;
-            default: break;
+        if (key == kOfxKey_Alt_L || key == kOfxKey_Alt_R) {
+            inst->altHeld = (strcmp(action, kOfxInteractActionKeyUp) != 0);
+            gInteractSuite->interactRedraw(interact);  // recolour highlight as feedback
+            return kOfxStatOK;
         }
-        if (!changed) return kOfxStatReplyDefault;
-        gParamSuite->paramSetValue(getParam(effect, changed), value);
-        gInteractSuite->interactRedraw(interact);
-        return kOfxStatOK;
+        return kOfxStatReplyDefault;
     }
 
     bool isPenDown   = strcmp(action, kOfxInteractActionPenDown) == 0;
@@ -325,16 +328,40 @@ static OfxStatus interactMain(const char* action, const void* handle,
         inst->cursorValid = true;
 
         if (isPenDown) {
-            inst->penDown = true;
-            OfxParamSetHandle paramSet = nullptr;
-            gEffectSuite->getParamSet(effect, &paramSet);
-            gParamSuite->paramEditBegin(paramSet, "History Brush stroke");
-            addStamp(effect, inst, pos[0], pos[1], time, /*force=*/true);
+            if (inst->altHeld) {
+                // Opt-drag: adjust the brush instead of painting. Anchor here.
+                inst->adjusting = true;
+                inst->adjStartX = pos[0];
+                inst->adjStartY = pos[1];
+                inst->adjStartSize = getDouble(effect, P_BRUSH_SIZE);
+                inst->adjStartSoft = getDouble(effect, P_SOFTNESS);
+            } else {
+                inst->penDown = true;
+                OfxParamSetHandle paramSet = nullptr;
+                gEffectSuite->getParamSet(effect, &paramSet);
+                gParamSuite->paramEditBegin(paramSet, "History Brush stroke");
+                addStamp(effect, inst, pos[0], pos[1], time, /*force=*/true);
+            }
         } else if (isPenMotion) {
-            if (inst->penDown)
+            if (inst->adjusting) {
+                // Horizontal drag sizes the brush (its edge tracks the cursor);
+                // vertical drag (up = softer) sets softness. Keep the highlight
+                // pinned at the anchor so it grows in place, Photoshop-style.
+                double dx = pos[0] - inst->adjStartX;
+                double dy = pos[1] - inst->adjStartY;
+                double newSize = std::min(2000.0, std::max(2.0,  inst->adjStartSize + 2.0 * dx));
+                double newSoft = std::min(0.99,   std::max(0.0,  inst->adjStartSoft + dy / 400.0));
+                gParamSuite->paramSetValue(getParam(effect, P_BRUSH_SIZE), newSize);
+                gParamSuite->paramSetValue(getParam(effect, P_SOFTNESS), newSoft);
+                inst->cursorX = inst->adjStartX;
+                inst->cursorY = inst->adjStartY;
+            } else if (inst->penDown) {
                 addStamp(effect, inst, pos[0], pos[1], time, /*force=*/false);
+            }
         } else if (isPenUp) {
-            if (inst->penDown) {
+            if (inst->adjusting) {
+                inst->adjusting = false;
+            } else if (inst->penDown) {
                 inst->penDown = false;
                 std::string data;
                 {
@@ -348,8 +375,10 @@ static OfxStatus interactMain(const char* action, const void* handle,
             }
         }
         gInteractSuite->interactRedraw(interact);
-        // Trap pen events while painting so Resolve doesn't also pan/select.
-        return (isPenMotion && !inst->penDown) ? kOfxStatReplyDefault : kOfxStatOK;
+        // Trap pen events while painting or adjusting so Resolve doesn't also
+        // pan/select; let plain hover motion pass through.
+        bool active = inst->penDown || inst->adjusting;
+        return (isPenMotion && !active) ? kOfxStatReplyDefault : kOfxStatOK;
     }
 
     return kOfxStatReplyDefault;

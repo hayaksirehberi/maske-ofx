@@ -41,23 +41,20 @@ Painted areas kill the dirt-removal key, so the original image shows through exa
 
 ### Adjusting the brush
 
-You can change size and softness without leaving the viewer:
+Adjust size and softness without leaving the viewer, Photoshop-style:
 
-| Key | Action |
-|---|---|
-| `↑` / `↓` | Brush size up / down |
-| `→` / `←` | Softness softer / harder |
+**Hold `Opt`/`Alt` and drag** in the viewer — drag **horizontally to size** the brush, **vertically to soften** it (up = softer). The highlight stays pinned where you pressed and grows in place, and it turns **yellow** while Opt is held so you can see the modifier is registering. Release Opt and drag normally to paint.
 
-Arrow keys are used on purpose — their codes are identical on every keyboard layout (Turkish, US, …) and need no AltGr/Shift.
+> Keyboard shortcuts aren't used: DaVinci Resolve grabs keys (arrows, brackets, …) for its own tools before the plugin sees them. Opt-drag rides on the mouse instead. It still depends on Resolve forwarding the bare `Opt` key to the plugin overlay — if the highlight doesn't turn yellow when you hold Opt, your Resolve build isn't forwarding it; use the panel sliders and let me know.
 
-The cursor is a **Photoshop-style translucent highlight** (red for paint, blue for erase), drawn as a filled disc so it stays solid at any zoom level. Softness reads as a **denser hard core inside a fainter halo**, and a small readout prints the exact `px` and `soft %`. The Brush Size / Softness sliders in the panel still work and stay in sync.
+The cursor is a **translucent highlight** (red for paint, blue for erase, yellow while adjusting), drawn as a filled disc so it stays solid at any zoom level. Softness reads as a **denser hard core inside a fainter halo**, and a small readout prints the exact `px` and `soft %`. The Brush Size / Softness sliders in the panel always work and stay in sync.
 
 ## Features
 
 | | |
 |---|---|
 | 🖌️ **Viewer painting** | Photoshop-style translucent brush highlight in the Color page viewer (OverlayInteractV2 + DrawSuite) — red for paint, blue for erase, solid at any zoom |
-| ⌨️ **In-viewer brush control** | Arrow keys (layout-independent) for size/softness, with a live highlight and `px`/`soft %` readout at the cursor — no trip to the panel |
+| 🖱️ **In-viewer brush control** | Opt/Alt-drag to size (horizontal) and soften (vertical), with a live highlight and `px`/`soft %` readout at the cursor — no trip to the panel |
 | 🎞️ **Per-frame strokes** | Strokes belong to the frame you paint them on; step through and correct frame by frame |
 | ↩️ **Undo & persistence** | One stroke = one undo step; strokes are saved inside the project |
 | 🔀 **Invert** | Output the matte directly in the polarity your key routing needs |
