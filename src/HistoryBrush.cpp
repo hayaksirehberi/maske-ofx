@@ -195,6 +195,20 @@ static void addStamp(OfxImageEffectHandle effect, EffectInstance* inst,
     gParamSuite->paramSetValue(getParam(effect, P_NUDGE), ++inst->nudgeCounter);
 }
 
+// Filled disc via a polygon fan. Ellipse in DrawSuite is an outline only, and
+// thin outlines break up / vanish when the viewer is zoomed out; a filled
+// polygon stays solid at any zoom.
+static void fillDisc(OfxDrawContextHandle ctx, double cx, double cy, double radius) {
+    const int kSegs = 64;
+    const double kPI = 3.14159265358979323846;
+    OfxPointD pts[kSegs];
+    for (int i = 0; i < kSegs; ++i) {
+        double a = 2.0 * kPI * i / kSegs;
+        pts[i] = {cx + radius * cos(a), cy + radius * sin(a)};
+    }
+    gDrawSuite->draw(ctx, kOfxDrawPrimitivePolygon, pts, kSegs);
+}
+
 static OfxStatus interactMain(const char* action, const void* handle,
                               OfxPropertySetHandle inArgs, OfxPropertySetHandle /*outArgs*/) {
     OfxInteractHandle interact = (OfxInteractHandle)handle;
@@ -222,37 +236,49 @@ static OfxStatus interactMain(const char* action, const void* handle,
         int erase = getChoice(effect, P_MODE);
         double cx = inst->cursorX, cy = inst->cursorY;
 
-        OfxRGBAColourF col = erase ? OfxRGBAColourF{1.0f, 0.3f, 0.3f, 1.0f}
-                                   : OfxRGBAColourF{0.3f, 1.0f, 0.5f, 1.0f};
-        gDrawSuite->setColour(ctx, &col);
-        gDrawSuite->setLineWidth(ctx, 1.5f);
+        // Photoshop-style translucent brush highlight, drawn as filled discs so
+        // it stays solid at every zoom level (thin outlines broke up / vanished
+        // when zoomed out). Paint is red, erase is blue. Softness reads as a
+        // denser hard core sitting inside a fainter full-radius halo.
+        OfxRGBAColourF tint = erase ? OfxRGBAColourF{0.35f, 0.55f, 1.0f, 1.0f}
+                                    : OfxRGBAColourF{1.0f, 0.22f, 0.22f, 1.0f};
+
+        OfxRGBAColourF halo = tint; halo.a = 0.18f;
+        gDrawSuite->setColour(ctx, &halo);
+        fillDisc(ctx, cx, cy, r);
+
+        OfxRGBAColourF core = tint; core.a = 0.30f;  // hard core, radius * (1 - softness)
+        gDrawSuite->setColour(ctx, &core);
+        fillDisc(ctx, cx, cy, r * (1.0 - soft));
+
+        // Crisp edge ring on top so the exact brush boundary is readable.
+        OfxRGBAColourF edge = tint; edge.a = 0.95f;
+        gDrawSuite->setColour(ctx, &edge);
+        gDrawSuite->setLineWidth(ctx, 2.0f);
         OfxPointD outer[2] = {{cx - r, cy - r}, {cx + r, cy + r}};
         gDrawSuite->draw(ctx, kOfxDrawPrimitiveEllipse, outer, 2);
 
-        // Dashed inner ring marks the hard core (radius * (1 - softness)); the
-        // gap out to the outer ring is the feathered falloff, so softness is
-        // visible on the canvas instead of hidden in a slider.
-        if (soft > 0.01) {
-            double ri = r * (1.0 - soft);
-            OfxPointD inner[2] = {{cx - ri, cy - ri}, {cx + ri, cy + ri}};
-            gDrawSuite->setLineStipple(ctx, kOfxDrawLineStipplePatternDash);
-            gDrawSuite->draw(ctx, kOfxDrawPrimitiveEllipse, inner, 2);
-            gDrawSuite->setLineStipple(ctx, kOfxDrawLineStipplePatternSolid);
-        }
-
-        // Numeric readout beside the cursor: diameter in px and softness percent.
+        // Numeric readout pinned a constant screen distance from the cursor so
+        // it stays legible regardless of zoom (offsets are in canonical units,
+        // scaled by the viewer's pixel scale).
+        double pscale[2] = {1.0, 1.0};
+        gPropSuite->propGetDoubleN(inArgs, kOfxInteractPropPixelScale, 2, pscale);
+        double mx = (pscale[0] > 0 ? 14.0 / pscale[0] : 14.0);
+        double my = (pscale[1] > 0 ? 14.0 / pscale[1] : 14.0);
         char label[64];
         snprintf(label, sizeof(label), "%d px   soft %d%%",
                  (int)lround(size), (int)lround(soft * 100.0));
-        OfxPointD tp = {cx + r + 8.0, cy + r + 8.0};
+        OfxPointD tp = {cx + mx, cy + my};
         gDrawSuite->drawText(ctx, label, &tp,
                              kOfxDrawTextAlignmentLeft | kOfxDrawTextAlignmentBottom);
         return kOfxStatOK;
     }
 
-    // Keyboard shortcuts: adjust brush without leaving the viewer. Bracket keys
-    // size (multiplicative, so steps feel even across the 2..2000 range), minus/
-    // equal soften. Redraw so the cursor ring + readout reflect the new value.
+    // Keyboard shortcuts: adjust the brush without leaving the viewer. Arrow keys
+    // are used because their key codes are identical on every keyboard layout
+    // (Turkish, US, etc.) and need no AltGr/Shift — unlike bracket keys. Up/Down
+    // size (multiplicative, so steps feel even across the 2..2000 range),
+    // Left/Right soften. Redraw so the highlight + readout reflect the new value.
     if (strcmp(action, kOfxInteractActionKeyDown) == 0 ||
         strcmp(action, kOfxInteractActionKeyRepeat) == 0) {
         OfxImageEffectHandle effect = interactEffect(inArgs);
@@ -263,14 +289,14 @@ static OfxStatus interactMain(const char* action, const void* handle,
         const char* changed = nullptr;
         double value = 0;
         switch (key) {
-            case kOfxKey_bracketleft:                                              // [ smaller
-                changed = P_BRUSH_SIZE; value = std::max(2.0, getDouble(effect, P_BRUSH_SIZE) / 1.15); break;
-            case kOfxKey_bracketright:                                             // ] bigger
+            case kOfxKey_Up:                                                       // bigger
                 changed = P_BRUSH_SIZE; value = std::min(2000.0, getDouble(effect, P_BRUSH_SIZE) * 1.15); break;
-            case kOfxKey_minus:                                                    // - harder
-                changed = P_SOFTNESS; value = std::max(0.0, getDouble(effect, P_SOFTNESS) - 0.05); break;
-            case kOfxKey_equal:                                                    // = softer
+            case kOfxKey_Down:                                                     // smaller
+                changed = P_BRUSH_SIZE; value = std::max(2.0, getDouble(effect, P_BRUSH_SIZE) / 1.15); break;
+            case kOfxKey_Right:                                                    // softer
                 changed = P_SOFTNESS; value = std::min(0.99, getDouble(effect, P_SOFTNESS) + 0.05); break;
+            case kOfxKey_Left:                                                     // harder
+                changed = P_SOFTNESS; value = std::max(0.0, getDouble(effect, P_SOFTNESS) - 0.05); break;
             default: break;
         }
         if (!changed) return kOfxStatReplyDefault;

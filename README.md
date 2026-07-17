@@ -45,17 +45,19 @@ You can change size and softness without leaving the viewer:
 
 | Key | Action |
 |---|---|
-| `[` / `]` | Brush size down / up |
-| `-` / `=` | Softness harder / softer |
+| `↑` / `↓` | Brush size up / down |
+| `→` / `←` | Softness softer / harder |
 
-The cursor shows it live: the outer ring is the brush diameter, the **dashed inner ring is the hard core** (the gap out to the outer ring is the feathered falloff), and a small readout prints the exact `px` and `soft %`. The Brush Size / Softness sliders in the panel still work and stay in sync.
+Arrow keys are used on purpose — their codes are identical on every keyboard layout (Turkish, US, …) and need no AltGr/Shift.
+
+The cursor is a **Photoshop-style translucent highlight** (red for paint, blue for erase), drawn as a filled disc so it stays solid at any zoom level. Softness reads as a **denser hard core inside a fainter halo**, and a small readout prints the exact `px` and `soft %`. The Brush Size / Softness sliders in the panel still work and stay in sync.
 
 ## Features
 
 | | |
 |---|---|
-| 🖌️ **Viewer painting** | Native brush cursor in the Color page viewer (OverlayInteractV2 + DrawSuite) — green for paint, red for erase |
-| ⌨️ **In-viewer brush control** | `[` / `]` size, `-` / `=` softness, with a live size/softness ring and readout at the cursor — no trip to the panel |
+| 🖌️ **Viewer painting** | Photoshop-style translucent brush highlight in the Color page viewer (OverlayInteractV2 + DrawSuite) — red for paint, blue for erase, solid at any zoom |
+| ⌨️ **In-viewer brush control** | Arrow keys (layout-independent) for size/softness, with a live highlight and `px`/`soft %` readout at the cursor — no trip to the panel |
 | 🎞️ **Per-frame strokes** | Strokes belong to the frame you paint them on; step through and correct frame by frame |
 | ↩️ **Undo & persistence** | One stroke = one undo step; strokes are saved inside the project |
 | 🔀 **Invert** | Output the matte directly in the polarity your key routing needs |
