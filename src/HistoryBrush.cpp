@@ -22,6 +22,7 @@
 #include "ofxImageEffect.h"
 #include "ofxParam.h"
 #include "ofxInteract.h"
+#include "ofxKeySyms.h"
 #include "ofxDrawSuite.h"
 #include "ofxPixels.h"
 #include "ofxGPURender.h"
@@ -216,16 +217,65 @@ static OfxStatus interactMain(const char* action, const void* handle,
         if (!inst || !inst->cursorValid) return kOfxStatOK;
 
         double size = getDouble(effect, P_BRUSH_SIZE);
+        double soft = getDouble(effect, P_SOFTNESS);
         double r = size * 0.5;
         int erase = getChoice(effect, P_MODE);
+        double cx = inst->cursorX, cy = inst->cursorY;
 
         OfxRGBAColourF col = erase ? OfxRGBAColourF{1.0f, 0.3f, 0.3f, 1.0f}
                                    : OfxRGBAColourF{0.3f, 1.0f, 0.5f, 1.0f};
         gDrawSuite->setColour(ctx, &col);
         gDrawSuite->setLineWidth(ctx, 1.5f);
-        OfxPointD corners[2] = {{inst->cursorX - r, inst->cursorY - r},
-                                {inst->cursorX + r, inst->cursorY + r}};
-        gDrawSuite->draw(ctx, kOfxDrawPrimitiveEllipse, corners, 2);
+        OfxPointD outer[2] = {{cx - r, cy - r}, {cx + r, cy + r}};
+        gDrawSuite->draw(ctx, kOfxDrawPrimitiveEllipse, outer, 2);
+
+        // Dashed inner ring marks the hard core (radius * (1 - softness)); the
+        // gap out to the outer ring is the feathered falloff, so softness is
+        // visible on the canvas instead of hidden in a slider.
+        if (soft > 0.01) {
+            double ri = r * (1.0 - soft);
+            OfxPointD inner[2] = {{cx - ri, cy - ri}, {cx + ri, cy + ri}};
+            gDrawSuite->setLineStipple(ctx, kOfxDrawLineStipplePatternDash);
+            gDrawSuite->draw(ctx, kOfxDrawPrimitiveEllipse, inner, 2);
+            gDrawSuite->setLineStipple(ctx, kOfxDrawLineStipplePatternSolid);
+        }
+
+        // Numeric readout beside the cursor: diameter in px and softness percent.
+        char label[64];
+        snprintf(label, sizeof(label), "%d px   soft %d%%",
+                 (int)lround(size), (int)lround(soft * 100.0));
+        OfxPointD tp = {cx + r + 8.0, cy + r + 8.0};
+        gDrawSuite->drawText(ctx, label, &tp,
+                             kOfxDrawTextAlignmentLeft | kOfxDrawTextAlignmentBottom);
+        return kOfxStatOK;
+    }
+
+    // Keyboard shortcuts: adjust brush without leaving the viewer. Bracket keys
+    // size (multiplicative, so steps feel even across the 2..2000 range), minus/
+    // equal soften. Redraw so the cursor ring + readout reflect the new value.
+    if (strcmp(action, kOfxInteractActionKeyDown) == 0 ||
+        strcmp(action, kOfxInteractActionKeyRepeat) == 0) {
+        OfxImageEffectHandle effect = interactEffect(inArgs);
+        if (!effect) return kOfxStatReplyDefault;
+        int key = 0;
+        gPropSuite->propGetInt(inArgs, kOfxPropKeySym, 0, &key);
+
+        const char* changed = nullptr;
+        double value = 0;
+        switch (key) {
+            case kOfxKey_bracketleft:                                              // [ smaller
+                changed = P_BRUSH_SIZE; value = std::max(2.0, getDouble(effect, P_BRUSH_SIZE) / 1.15); break;
+            case kOfxKey_bracketright:                                             // ] bigger
+                changed = P_BRUSH_SIZE; value = std::min(2000.0, getDouble(effect, P_BRUSH_SIZE) * 1.15); break;
+            case kOfxKey_minus:                                                    // - harder
+                changed = P_SOFTNESS; value = std::max(0.0, getDouble(effect, P_SOFTNESS) - 0.05); break;
+            case kOfxKey_equal:                                                    // = softer
+                changed = P_SOFTNESS; value = std::min(0.99, getDouble(effect, P_SOFTNESS) + 0.05); break;
+            default: break;
+        }
+        if (!changed) return kOfxStatReplyDefault;
+        gParamSuite->paramSetValue(getParam(effect, changed), value);
+        gInteractSuite->interactRedraw(interact);
         return kOfxStatOK;
     }
 

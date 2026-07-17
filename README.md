@@ -39,11 +39,23 @@ Painted areas kill the dirt-removal key, so the original image shows through exa
 4. Drag the node's key output (blue square) to the dirt-removal node's key input (blue triangle).
 5. Paint in the viewer. Done.
 
+### Adjusting the brush
+
+You can change size and softness without leaving the viewer:
+
+| Key | Action |
+|---|---|
+| `[` / `]` | Brush size down / up |
+| `-` / `=` | Softness harder / softer |
+
+The cursor shows it live: the outer ring is the brush diameter, the **dashed inner ring is the hard core** (the gap out to the outer ring is the feathered falloff), and a small readout prints the exact `px` and `soft %`. The Brush Size / Softness sliders in the panel still work and stay in sync.
+
 ## Features
 
 | | |
 |---|---|
 | 🖌️ **Viewer painting** | Native brush cursor in the Color page viewer (OverlayInteractV2 + DrawSuite) — green for paint, red for erase |
+| ⌨️ **In-viewer brush control** | `[` / `]` size, `-` / `=` softness, with a live size/softness ring and readout at the cursor — no trip to the panel |
 | 🎞️ **Per-frame strokes** | Strokes belong to the frame you paint them on; step through and correct frame by frame |
 | ↩️ **Undo & persistence** | One stroke = one undo step; strokes are saved inside the project |
 | 🔀 **Invert** | Output the matte directly in the polarity your key routing needs |
